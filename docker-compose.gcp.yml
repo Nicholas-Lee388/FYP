@@ -1,0 +1,47 @@
+services:
+  api:
+    build: .
+    command: python -m backend.app
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      - cloud-sql-proxy
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: celery -A backend.tasks.celery worker --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - cloud-sql-proxy
+      - redis
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    command: streamlit run frontend/streamlit_app.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.19.0
+    command:
+      - "--address=0.0.0.0"
+      - "--port=5432"
+      - "${CLOUD_SQL_INSTANCE_CONNECTION_NAME}"
+    restart: unless-stopped
+

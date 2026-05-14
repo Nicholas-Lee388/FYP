@@ -1,0 +1,70 @@
+services:
+  api:
+    build: .
+    command: python -m backend.app
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://fyp2:fyp2@db:5432/fyp2
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      USE_CELERY: "true"
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+
+  worker:
+    build: .
+    command: celery -A backend.tasks.celery worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://fyp2:fyp2@db:5432/fyp2
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      USE_CELERY: "true"
+    depends_on:
+      - api
+      - redis
+      - db
+    volumes:
+      - .:/app
+
+  dashboard:
+    build: .
+    command: streamlit run frontend/streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+    env_file:
+      - .env
+    environment:
+      STREAMLIT_API_URL: http://api:5000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    volumes:
+      - .:/app
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fyp2
+      POSTGRES_USER: fyp2
+      POSTGRES_PASSWORD: fyp2
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
